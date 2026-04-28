@@ -8,7 +8,7 @@ import { PhysiognomyModule } from './physiognomy/physiognomy.module';
 import { CharacterModule } from './character/character.module';
 import { TransmissionModule } from './transmission/transmission.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
-import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core/constants';
+import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 
 @Module({
