@@ -10,6 +10,7 @@ import { TransmissionModule } from './transmission/transmission.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
+import { UserModule } from './user/user.module';
 
 @Module({
   imports: [ConfigModule.forRoot({
@@ -28,7 +29,7 @@ import { TransformInterceptor } from './common/interceptors/transform.intercepto
       entities: [__dirname + '/**/*.entity{.ts,.js}'],
       synchronize: true,
     }),
-  }), SajuModule, PhysiognomyModule, CharacterModule, TransmissionModule],
+  }), SajuModule, PhysiognomyModule, CharacterModule, TransmissionModule, UserModule],
   controllers: [AppController],
   providers: [AppService,
     {
