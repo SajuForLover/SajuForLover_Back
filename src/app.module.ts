@@ -1,14 +1,15 @@
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { ConfigModule, ConfigService } from 'node_modules/@nestjs/config';
-import { TypeOrmModule } from 'node_modules/@nestjs/typeorm/dist/typeorm.module';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import { SajuModule } from './saju/saju.module';
 import { PhysiognomyModule } from './physiognomy/physiognomy.module';
 import { CharacterModule } from './character/character.module';
 import { TransmissionModule } from './transmission/transmission.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
-import { APP_FILTER } from 'node_modules/@nestjs/core/constants';
+import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core/constants';
+import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 
 @Module({
   imports: [ConfigModule.forRoot({
@@ -34,6 +35,10 @@ import { APP_FILTER } from 'node_modules/@nestjs/core/constants';
       provide: APP_FILTER,
       useClass: HttpExceptionFilter, // 전역 필터로 사용할 클래스 지정
     },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: TransformInterceptor,
+    }
   ],
 })
 export class AppModule { }
