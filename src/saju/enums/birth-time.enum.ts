@@ -1,0 +1,31 @@
+export enum BirthTime {
+    UNKNOWN = 'unknown',
+    JIN = 'jin',
+    SA = 'sa',
+    O = 'o',
+    MI = 'mi',
+    SIN = 'sin',
+    YU = 'yu',
+    SUL = 'sul',
+    HAE = 'hae',
+    JA = 'ja',
+    CHUK = 'chuk',
+    IN = 'in',
+    MYO = 'myo',
+}
+
+export const BirthTimeDescription: Record<BirthTime, string> = {
+    [BirthTime.UNKNOWN]: '모름',
+    [BirthTime.JA]: '자시(23:30~01:29)',
+    [BirthTime.CHUK]: '축시(01:30~03:29)',
+    [BirthTime.IN]: '인시(03:30~05:29)',
+    [BirthTime.MYO]: '묘시(05:30~07:29)',
+    [BirthTime.JIN]: '진시(07:30~09:29)',
+    [BirthTime.SA]: '사시(09:30~11:29)',
+    [BirthTime.O]: '오시(11:30~13:29)',
+    [BirthTime.MI]: '미시(13:30~15:29)',
+    [BirthTime.SIN]: '신시(15:30~17:29)',
+    [BirthTime.YU]: '유시(17:30~19:29)',
+    [BirthTime.SUL]: '술시(19:30~21:29)',
+    [BirthTime.HAE]: '해시(21:30~23:29)',
+};
