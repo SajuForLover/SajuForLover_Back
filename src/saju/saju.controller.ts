@@ -15,7 +15,7 @@ export class SajuController {
   @ApiOperation({ summary: '사주 분석' })
   @ApiBody({ type: CreateSajuDto })
   create(@Body() createSajuDto: CreateSajuDto) {
-    const birthTime = createSajuDto.birthTime === 'unknown' ? '알 수 없는 시간' : BirthTimeDescription[createSajuDto.birthTime];
+    const birthTime = BirthTimeDescription[createSajuDto.birthTime];
     const gender = GenderDescription[createSajuDto.gender];
     const calendar = CalendarTypeDescription[createSajuDto.calendar];
     const userInput = {
@@ -28,10 +28,11 @@ export class SajuController {
     };
     console.log('user_input:', userInput);
     return this.sajuService.create(userInput);
-    }
-
-    @Get(':id')
-    findOne(@Param('id') id: string) {
-      return this.sajuService.findOne(+id);
-    }
   }
+
+  @Get(':id') // URL 경로에서 ID를 받도록 수정
+  @ApiOperation({ summary: '사주 분석 결과 조회' })
+  findOne(@Param('id') id: string) {
+    return this.sajuService.findOne(id);
+  }
+}

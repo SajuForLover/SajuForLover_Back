@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { CreatePhysiognomyDto } from './dto/create-physiognomy.dto';
 import { UpdatePhysiognomyDto } from './dto/update-physiognomy.dto';
 import { GoogleGenAI } from '@google/genai';
-import { ConfigService } from 'node_modules/@nestjs/config';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class PhysiognomyService {
@@ -39,20 +39,14 @@ export class PhysiognomyService {
             "forehead": {
               "shape": "넓고 평평한 이마",
               "meaning": "초년운이 좋고 학문적 성취가 높을 상"
-            },
-            "eyes": {...},
-            "nose": {...},
-            "mouth": {...}
+            }, "eyes": {...}, "nose": {...}, "mouth": {...}
           },
           "fortune_prediction": {
             "wealth": {
               "score": 85,
               "description": "꾸준한 근로 소득과 더불어 부동산 운이 따름"
             },
-            "romance": {...},
-            "career": {...},
-            "academic": {...},
-            "health": {...}
+            "romance": {...}, "career": {...}, "academic": {...}, "health": {...}
           },
           "summary_advice": "전반적으로 강직한 금(金)의 기운을 타고났으므로, 유연한 태도를 기른다면 대성할 관상임"
         }

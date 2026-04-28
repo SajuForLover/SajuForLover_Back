@@ -2,16 +2,20 @@ import { Injectable } from '@nestjs/common';
 import { CreateSajuDto } from './dto/create-saju.dto';
 import { UpdateSajuDto } from './dto/update-saju.dto';
 import { GoogleGenAI } from '@google/genai';
-import { ConfigService } from 'node_modules/@nestjs/config';
+import { ConfigService } from '@nestjs/config';
 import { BirthTimeDescription } from './enums/birth-time.enum';
 import { CalendarTypeDescription } from './enums/calendar-type.enum';
 import { GenderDescription } from './enums/gender.enum';
+import { v1 as uuid } from 'uuid';
+import { Saju } from './entities/saju.entity';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 
 @Injectable()
 export class SajuService {
   private ai: GoogleGenAI;
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(@InjectRepository(Saju) private readonly sajuRepository: Repository<Saju>, private readonly configService: ConfigService) {
     this.ai = new GoogleGenAI({ apiKey: this.configService.get<string>('GOOGLE_API_KEY') });
   }
 
@@ -34,10 +38,7 @@ export class SajuService {
             "nickname": "듬직한바위산_무토",
             "soul_title": "흔들리지 않는 대지",
             "core_description": "어떤 시련에도 묵묵히 자리를 지키는 듬직한 리더 타입",
-            "matching_mbti": [
-              "ISTJ",
-              "ESTJ"
-            ]
+            "matching_mbti": ["ISTJ", "ESTJ"]
           },
           "five_elements": {
             "description": "대충 설명 : 5줄",
@@ -84,25 +85,15 @@ export class SajuService {
             ]
           },
           "career": {
-            "recommended_jobs": [
-              "부동산 자산운용가",
-              "플랫폼 운영 기획자",
-              "전통 장인"
-            ],
+            "recommended_jobs": ["부동산 자산운용가", "플랫폼 운영 기획자"],
             "work_style": "혼자서 묵묵히 목표를 달성하는 '고독한 사냥꾼' 스타일",
             "warning_note": "고집이 너무 세서 팀원들이 숨막혀 할 수 있음!"
           },
           "fortune": {
-            "lucky_colors": [
-              "Red",
-              "White"
-            ],
+            "lucky_colors": ["빨간색", "하얀색"],
             "lucky_direction": "South",
             "lucky_food": "매콤한 낙지볶음 (부족한 화 기운 보강)",
-            "lucky_numbers": [
-              2,
-              7
-            ],
+            "lucky_numbers": [2, 7],
             "best_partner": "따뜻한 햇살 같은 캐릭터 (화 기운)",
             "worst_partner": "나를 자꾸 베어내려는 예리한 캐릭터 (금 기운)"
           }
@@ -126,6 +117,9 @@ export class SajuService {
     console.log(`AI 응답 시간: ${(end.getTime() - start.getTime()) / 1000}초`);
 
     const data = response.text ? JSON.parse(response.text.replace(/```json/g, '').replace(/```/g, '').trim()).data : null;
+    const id = uuid();
+
+    await this.sajuRepository.save({ id, data: data, ...userInput });
 
     data.profile.name = userInput.name;
     data.profile.gender = userInput.gender;
@@ -134,10 +128,17 @@ export class SajuService {
     data.profile.calendar = userInput.calendar;
     data.profile.birthTime = userInput.birthTime;
 
-    return data;
+    return { id, data };
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} saju`;
+  async findOne(id: string) {
+    console.log('SajuService.findOne id:', id);
+    const result = await this.sajuRepository.findOne({ where: { id } });
+    
+    if (!result) {
+      throw new Error(`ID ${id}에 해당하는 사주 분석 결과를 찾을 수 없습니다.`);
+    }
+
+    return { id: result.id, saju: result?.data };
   }
 }
