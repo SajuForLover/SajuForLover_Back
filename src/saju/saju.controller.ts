@@ -30,9 +30,9 @@ export class SajuController {
     return this.sajuService.create(userInput);
   }
 
-  @Get(':id') // URL 경로에서 ID를 받도록 수정
+  @Get(':uuid') // URL 경로에서 ID를 받도록 수정
   @ApiOperation({ summary: '사주 분석 결과 조회' })
-  findOne(@Param('id') id: string) {
-    return this.sajuService.findOne(id);
+  findOne(@Param('uuid') uuid: string) {
+    return this.sajuService.findOne(uuid);
   }
 }

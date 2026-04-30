@@ -10,17 +10,28 @@ import { v1 as uuid } from 'uuid';
 import { Saju } from './entities/saju.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { NotFoundException } from '@nestjs/common';
+import { User } from '@/user/entities/user.entity';
 
 @Injectable()
 export class SajuService {
   private ai: GoogleGenAI;
 
-  constructor(@InjectRepository(Saju) private readonly sajuRepository: Repository<Saju>, private readonly configService: ConfigService) {
+  constructor(@InjectRepository(Saju) private readonly sajuRepository: Repository<Saju>,
+    @InjectRepository(User) private readonly userRepository: Repository<User>,
+    private readonly configService: ConfigService) {
     this.ai = new GoogleGenAI({ apiKey: this.configService.get<string>('GOOGLE_API_KEY') });
   }
 
 
   async create(userInput: any) {
+    const id = uuid();
+
+    await this.userRepository.save({
+      uuid: id,
+      ...userInput,
+    });
+
     const prompt = `
       당시은 사주를 분석하는 전문가입니다. 다음은 사주 분석에 필요한 정보입니다. 
       아래 정보를 바탕으로 사주 분석을 해주세요.
@@ -117,10 +128,13 @@ export class SajuService {
     console.log(`AI 응답 시간: ${(end.getTime() - start.getTime()) / 1000}초`);
 
     const data = response.text ? JSON.parse(response.text.replace(/```json/g, '').replace(/```/g, '').trim()).data : null;
-    const id = uuid();
 
-    await this.sajuRepository.save({ id, data: data, ...userInput });
-
+    if (await this.sajuRepository.findOne({ where: { user: { uuid: id } } })) {
+      await this.sajuRepository.update({ user: { uuid: id } }, { data: data });
+    } else {
+      const saju = await this.sajuRepository.save({ data: data, ...userInput, user: { uuid: id } });
+    }
+    
     data.profile.name = userInput.name;
     data.profile.gender = userInput.gender;
     data.profile.birthDate = userInput.birthDate;
@@ -131,14 +145,15 @@ export class SajuService {
     return { id, data };
   }
 
-  async findOne(id: string) {
-    console.log('SajuService.findOne id:', id);
-    const result = await this.sajuRepository.findOne({ where: { id } });
-    
+  async findOne(uuid: string) {
+    console.log('SajuService.findOne uuid:', uuid);
+
+    const result = await this.sajuRepository.findOne({ where: { user: { uuid: uuid } } });
+
     if (!result) {
-      throw new Error(`ID ${id}에 해당하는 사주 분석 결과를 찾을 수 없습니다.`);
+      throw new NotFoundException(`해당 ID에 해당하는 사주 분석 결과를 찾을 수 없습니다.`);
     }
 
-    return { id: result.id, saju: result?.data };
+    return { saju: result?.data };
   }
 }

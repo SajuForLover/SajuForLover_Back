@@ -8,22 +8,28 @@ import 'multer';
 
 @Controller('physiognomy')
 export class PhysiognomyController {
-  constructor(private readonly physiognomyService: PhysiognomyService) {}
+  constructor(private readonly physiognomyService: PhysiognomyService) { }
 
   @Post()
   @ApiOperation({ summary: '관상 분석' })
-    @ApiConsumes('multipart/form-data') // 중요: 파일 업로드 형식 명시
-    @ApiBody({
-        schema: {
-            type: 'object',
-            properties: {
-                image: { // 이 이름이 FileInterceptor('image')의 이름과 일치해야 함
-                    type: 'string',
-                    format: 'binary',
-                },
-            },
+  @ApiConsumes('multipart/form-data') // 중요: 파일 업로드 형식 명시
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        uuid: {
+          type: 'string',
+          description: '사용자 uuid',
+          example: 'user-uuid-123',
         },
-    })
+        image: { // 이 이름이 FileInterceptor('image')의 이름과 일치해야 함
+          type: 'string',
+          format: 'binary',
+        },
+      },
+      required: ['uuid', 'image'], // uuid와 image 모두 필수
+    },
+  })
   @UseInterceptors(FileInterceptor('image'))
   create(@Body() createPhysiognomyDto: CreatePhysiognomyDto, @UploadedFile() image: Express.Multer.File) {
     if (!image) {
@@ -36,8 +42,8 @@ export class PhysiognomyController {
     return this.physiognomyService.create(createPhysiognomyDto, image);
   }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.physiognomyService.findOne(+id);
+  @Get(':uuid')
+  findOne(@Param('uuid') uuid: string) {
+    return this.physiognomyService.findOne(uuid);
   }
 }
