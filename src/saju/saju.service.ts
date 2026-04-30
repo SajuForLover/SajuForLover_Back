@@ -1,26 +1,159 @@
 import { Injectable } from '@nestjs/common';
 import { CreateSajuDto } from './dto/create-saju.dto';
 import { UpdateSajuDto } from './dto/update-saju.dto';
+import { GoogleGenAI } from '@google/genai';
+import { ConfigService } from '@nestjs/config';
+import { BirthTimeDescription } from './enums/birth-time.enum';
+import { CalendarTypeDescription } from './enums/calendar-type.enum';
+import { GenderDescription } from './enums/gender.enum';
+import { v1 as uuid } from 'uuid';
+import { Saju } from './entities/saju.entity';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { NotFoundException } from '@nestjs/common';
+import { User } from '@/user/entities/user.entity';
 
 @Injectable()
 export class SajuService {
-  create(createSajuDto: CreateSajuDto) {
-    return 'This action adds a new saju';
+  private ai: GoogleGenAI;
+
+  constructor(@InjectRepository(Saju) private readonly sajuRepository: Repository<Saju>,
+    @InjectRepository(User) private readonly userRepository: Repository<User>,
+    private readonly configService: ConfigService) {
+    this.ai = new GoogleGenAI({ apiKey: this.configService.get<string>('GOOGLE_API_KEY') });
   }
 
-  findAll() {
-    return `This action returns all saju`;
+
+  async create(userInput: any) {
+    const id = uuid();
+
+    await this.userRepository.save({
+      uuid: id,
+      ...userInput,
+    });
+
+    const prompt = `
+      당시은 사주를 분석하는 전문가입니다. 다음은 사주 분석에 필요한 정보입니다. 
+      아래 정보를 바탕으로 사주 분석을 해주세요.
+      이름: ${userInput.name}
+      성별: ${userInput.gender}
+      생년월일: ${userInput.birthDate}
+      태어난 장소: ${userInput.location}
+      달력 종류: ${userInput.calendar}
+      태어난 시간: ${userInput.birthTime}
+      사주를 분석한 후 아래의 형식처럼 무조건 JSON 형태로 결과를 제공해주세요. 순수한 JSON 중괄호 { 로 시작해서 }로 끝나야 합니다. 
+      "data": 
+        { 
+          "profile": {
+            "description": "대충 설명 : 5줄",
+            "nickname": "듬직한바위산_무토",
+            "soul_title": "흔들리지 않는 대지",
+            "core_description": "어떤 시련에도 묵묵히 자리를 지키는 듬직한 리더 타입",
+            "matching_mbti": ["ISTJ", "ESTJ"]
+          },
+          "five_elements": {
+            "description": "대충 설명 : 5줄",
+            "elements": [
+              {
+                "type": "Earth",
+                "name_ko": "흙",
+                "ratio_percent": 66.7,
+                "characteristics": "압도적인 자존감과 고집, 듬직함"
+              },
+              ...
+            ]
+          },
+          "stats": {
+            "description": "대충 설명 : 5줄",
+            "attributes": [
+              {
+                "type": "Patience",
+                "name_ko": "인내심",
+                "score": 95,
+                "status": "MAX",
+                "status_description": "최상급 맷집"
+              },
+              {
+                "type": "Execution",
+                "name_ko": "실행력",
+                ...
+              },
+              {
+                "type": "Money_Luck",
+                "name_ko": "재물운",
+                ...
+              },
+              {
+                "type": "Social_Power",
+                "name_ko": "사회성",
+                ...
+              },
+              {
+                "type": "Creative",
+                "name_ko": "창의력",
+                ...
+              }
+            ]
+          },
+          "career": {
+            "recommended_jobs": ["부동산 자산운용가", "플랫폼 운영 기획자"],
+            "work_style": "혼자서 묵묵히 목표를 달성하는 '고독한 사냥꾼' 스타일",
+            "warning_note": "고집이 너무 세서 팀원들이 숨막혀 할 수 있음!"
+          },
+          "fortune": {
+            "lucky_colors": ["빨간색", "하얀색"],
+            "lucky_direction": "South",
+            "lucky_food": "매콤한 낙지볶음 (부족한 화 기운 보강)",
+            "lucky_numbers": [2, 7],
+            "best_partner": "따뜻한 햇살 같은 캐릭터 (화 기운)",
+            "worst_partner": "나를 자꾸 베어내려는 예리한 캐릭터 (금 기운)"
+          }
+        }
+      }
+    `;
+
+    const start = new Date();
+    const response = await this.ai.models.generateContent({
+      model: 'gemma-3-12b-it',
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            { text: prompt },
+          ],
+        },
+      ],
+    });
+    const end = new Date();
+    console.log(`AI 응답 시간: ${(end.getTime() - start.getTime()) / 1000}초`);
+
+    const data = response.text ? JSON.parse(response.text.replace(/```json/g, '').replace(/```/g, '').trim()).data : null;
+
+    if (await this.sajuRepository.findOne({ where: { user: { uuid: id } } })) {
+      await this.sajuRepository.update({ user: { uuid: id } }, { data: data });
+    } else {
+      const saju = await this.sajuRepository.save({ data: data, ...userInput, user: { uuid: id } });
+    }
+    
+    data.profile.name = userInput.name;
+    data.profile.gender = userInput.gender;
+    data.profile.birthDate = userInput.birthDate;
+    data.profile.location = userInput.location;
+    data.profile.calendar = userInput.calendar;
+    data.profile.birthTime = userInput.birthTime;
+
+    return { id, data };
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} saju`;
-  }
+  async findOne(uuid: string) {
+    console.log('SajuService.findOne uuid:', uuid);
 
-  update(id: number, updateSajuDto: UpdateSajuDto) {
-    return `This action updates a #${id} saju`;
-  }
+    const result = await this.sajuRepository.findOne({ where: { user: { uuid: uuid } } });
 
-  remove(id: number) {
-    return `This action removes a #${id} saju`;
+    if (!result) {
+      throw new NotFoundException(`해당 ID에 해당하는 사주 분석 결과를 찾을 수 없습니다.`);
+    }
+
+    return { saju: result?.data };
   }
 }
