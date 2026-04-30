@@ -28,7 +28,7 @@ DB_HOST=localhost
 DB_PORT=3306
 DB_USERNAME=root
 DB_PASSWORD=your_password
-DB_DATABASE=sajuforlover_db
+DB_DATABASE=db_name
 ```
 
 ## 프로젝트 실행 (Running the app)
@@ -48,7 +48,7 @@ npm run start:prod
 
 서버 실행 후, 아래 URL로 접속하여 Swagger UI를 통해 API 명세서를 확인하고 테스트할 수 있습니다.
 
-- **Swagger URL:** `http://localhost:3000/api` (포트 번호는 환경에 따라 다를 수 있습니다)
+- **Swagger URL:** `http://localhost:3000/api-docs` (포트 번호는 환경에 따라 다를 수 있습니다)
 
 ## 주요 기능
 
