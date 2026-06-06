@@ -1,6 +1,7 @@
 export interface CharacterMeta {
   id: string;
   name: string;
+  gender: 'male' | 'female';
   birthDate: string; // YYYY-MM-DD
   birthTime?: string; // HH:MM
   age?: number;
@@ -15,6 +16,7 @@ export const CHARACTERS_META: CharacterMeta[] = [
   {
     id: 'yunseah',
     name: '윤세아',
+    gender: 'female',
     birthDate: '2009-04-12',
     birthTime: '06:20',
     age: 17,
@@ -27,6 +29,7 @@ export const CHARACTERS_META: CharacterMeta[] = [
   {
     id: 'choiharam',
     name: '최하람',
+    gender: 'female',
     birthDate: '2008-08-05',
     birthTime: '14:10',
     age: 18,
@@ -39,6 +42,7 @@ export const CHARACTERS_META: CharacterMeta[] = [
   {
     id: 'kwaknayun',
     name: '곽나연',
+    gender: 'female',
     birthDate: '2007-11-21',
     birthTime: '09:45',
     age: 19,
@@ -51,6 +55,7 @@ export const CHARACTERS_META: CharacterMeta[] = [
   {
     id: 'ansuho',
     name: '안수호',
+    gender: 'male',
     birthDate: '2009-06-18',
     birthTime: '12:30',
     age: 17,
@@ -63,6 +68,7 @@ export const CHARACTERS_META: CharacterMeta[] = [
   {
     id: 'kimjaehyun',
     name: '김재현',
+    gender: 'male',
     birthDate: '2008-02-02',
     birthTime: '07:50',
     age: 18,
@@ -75,6 +81,7 @@ export const CHARACTERS_META: CharacterMeta[] = [
   {
     id: 'seongchanyeong',
     name: '성찬영',
+    gender: 'male',
     birthDate: '2007-10-09',
     birthTime: '22:15',
     age: 19,
