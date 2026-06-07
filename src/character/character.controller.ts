@@ -25,9 +25,17 @@ export class CharacterController {
     return this.characterService.findAll();
   }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.characterService.findOne(+id);
+  @Get(':userId')
+  async findOne(@Param('userId') userId: string) {
+    const result = await this.characterService.findCompatibilityByUserId(userId);
+    if (!result) return null;
+    return {
+      characterId: result.characterId,
+      characterName: result.characterName,
+      overallScore: result.overallScore,
+      badgeScores: result.badgeScores,
+      sections: result.sections,
+    };
   }
 
   @Patch(':id')
