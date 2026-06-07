@@ -1,4 +1,4 @@
-import { IsEmail, IsString, IsUUID } from 'class-validator';
+import { IsEmail, IsString, IsUUID, IsOptional } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateTransmissionDto {
@@ -9,4 +9,9 @@ export class CreateTransmissionDto {
   @ApiProperty({ description: '사용자 이메일', example: 'user@example.com' })
   @IsEmail()
   email!: string;
+
+  @ApiProperty({ description: '네컷 사진 데이터 (Base64)', required: false })
+  @IsString()
+  @IsOptional()
+  photo?: string;
 }

@@ -39,7 +39,7 @@ export class TransmissionService {
   }
 
   async create(createTransmissionDto: CreateTransmissionDto) {
-    const { userId, email } = createTransmissionDto;
+    const { userId, email, photo } = createTransmissionDto;
 
     // 사용자 정보 조회
     const user = await this.userRepository.findOne({ where: { uuid: userId } });
@@ -63,13 +63,26 @@ export class TransmissionService {
     ]);
     console.log('TransmissionService.create user:', user);
 
-    // 이메일 본문 생성
+    // 이메일 본문 생성 (photo 인자 추가)
     const htmlContent = this.generateEmailHtml(
       user,
       saju || null,
       physiognomy || null,
       compatibility || null,
+      !!photo,
     );
+
+    const attachments: any[] = [];
+    if (photo) {
+      // Base64 데이터에서 실제 내용 추출
+      const base64Data = photo.replace(/^data:image\/\w+;base64,/, '');
+      attachments.push({
+        filename: 'four-cut-photo.png',
+        content: base64Data,
+        encoding: 'base64',
+        cid: 'four_cut_photo', // HTML 본문에서 참조할 ID
+      });
+    }
 
     // 이메일 전송
     try {
@@ -78,6 +91,7 @@ export class TransmissionService {
         to: email,
         subject: `[애인사주오!] ${user.name}님의 궁합 분석 결과입니다 💕`,
         html: htmlContent,
+        attachments,
       });
 
       return { success: true, message: '이메일이 정상적으로 전송되었습니다.' };
@@ -94,6 +108,7 @@ export class TransmissionService {
     saju: Saju | null,
     physiognomy: Physiognomy | null,
     compatibility: Compatibility | null,
+    hasPhoto: boolean = false,
   ): string {
     const sajuData: any = saju?.data || {};
     const physiognomyData: any = physiognomy?.data || {};
@@ -354,6 +369,21 @@ export class TransmissionService {
                         : ''
                     }
                   </div>
+                </div>
+              </div>
+            `
+                : ''
+            }
+
+            <!-- 네컷 사진 -->
+            ${
+              hasPhoto
+                ? `
+              <div class="section">
+                <div class="section-title">📸 추억의 네컷사진</div>
+                <div style="text-align: center; background: #fdfdfd; padding: 20px; border-radius: 12px; border: 1px solid #f0f0f0;">
+                  <img src="cid:four_cut_photo" alt="네컷사진" style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);" />
+                  <p style="font-size: 12px; color: #999; margin-top: 10px;">당신과 캐릭터의 소중한 순간입니다 💕</p>
                 </div>
               </div>
             `
