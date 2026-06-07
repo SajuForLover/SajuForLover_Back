@@ -1,4 +1,4 @@
-﻿# 애인사주오! (SajuForLover) Backend API
+# 애인사주오! (SajuForLover) Backend API
 
 AI(Google GenAI) 모델을 활용하여 사용자의 사주와 관상을 분석하는 백엔드 서버입니다. NestJS 프레임워크와 TypeORM을 기반으로 구현되었습니다.
 
