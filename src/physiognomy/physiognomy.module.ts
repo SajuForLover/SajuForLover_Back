@@ -10,4 +10,4 @@ import { User } from '@/user/entities/user.entity';
   controllers: [PhysiognomyController],
   providers: [PhysiognomyService],
 })
-export class PhysiognomyModule {}
+export class PhysiognomyModule { }

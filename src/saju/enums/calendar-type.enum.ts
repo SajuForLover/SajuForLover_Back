@@ -1,6 +1,6 @@
 export enum CalendarType {
-    SOLAR = 'Solar',
-    LUNAR = 'Lunar',
+    SOLAR = 'solar',
+    LUNAR = 'lunar',
 }
 
 export const CalendarTypeDescription: { [key in CalendarType]: string } = {

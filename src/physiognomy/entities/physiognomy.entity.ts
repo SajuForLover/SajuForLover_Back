@@ -9,6 +9,9 @@ export class Physiognomy {
     @Column('json')
     data!: object;
 
+    @Column({ default: false })
+    isDone!: boolean;
+
     @CreateDateColumn()
     createdAt!: Date;
 

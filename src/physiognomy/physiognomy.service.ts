@@ -23,11 +23,28 @@ export class PhysiognomyService {
     const base64Data = image.buffer.toString('base64');
     const mimeType = image.mimetype;
 
-    const user = await this.userRepository.findOne({ where: { uuid: createPhysiognomyDto.uuid } });
+    const user = await this.userRepository.findOne({ where: { uuid: createPhysiognomyDto.user_id } });
     if (!user) {
       throw new NotFoundException('해당 ID에 해당하는 사용자를 찾을 수 없습니다.');
     }
 
+    await this.createPhysiognomyData(user, createPhysiognomyDto, base64Data, mimeType);
+
+    return { user_id: user.uuid };
+  }
+  async findOne(user_id: string) {
+    console.log('PhysiognomyService.findOne user_id:', user_id);
+
+    const result = await this.physiognomyRepository.findOne({ where: { user: { uuid: user_id } } });
+
+    if (!result) {
+      throw new NotFoundException(`해당 ID에 해당하는 관상 분석 결과를 찾을 수 없습니다.`);
+    }
+
+    return { physiognomy: result?.data };
+  }
+
+  async createPhysiognomyData(user, createPhysiognomyDto: CreatePhysiognomyDto, base64Data: string, mimeType: string) {
     const prompt = `
         당신은 30년 경력의 현대적인 관상 전문가입니다. 
         사용자의 정보는 다음과 같습니다:
@@ -66,6 +83,7 @@ export class PhysiognomyService {
       `;
 
     const start = new Date();
+    console.log('관상 - AI 요청 시작 시간:', start.toISOString());
     const response = await this.ai.models.generateContent({
       model: 'gemini-3.1-flash-lite-preview',
       contents: [
@@ -82,27 +100,17 @@ export class PhysiognomyService {
       }
     });
     const end = new Date();
-    console.log(`AI 응답 시간: ${(end.getTime() - start.getTime()) / 1000}초`);
+    console.log('관상 - AI 응답 완료 시간:', end.toISOString());
+    console.log(`관상 - AI 응답 시간: ${(end.getTime() - start.getTime()) / 1000}초`);
 
     const data = response.text || '{}';
     const dataObj = JSON.parse(data);
-    if (await this.physiognomyRepository.findOne({ where: { user: { uuid: createPhysiognomyDto.uuid } } })) {
-      await this.physiognomyRepository.update({ user: { uuid: createPhysiognomyDto.uuid } }, { data: dataObj });
+    if (await this.physiognomyRepository.findOne({ where: { user: { uuid: createPhysiognomyDto.user_id } } })) {
+      await this.physiognomyRepository.update({ user: { uuid: createPhysiognomyDto.user_id } }, { data: dataObj, isDone: true });
     } else {
-      await this.physiognomyRepository.save({ data: dataObj, user: { uuid: createPhysiognomyDto.uuid } });
+      await this.physiognomyRepository.save({ data: dataObj, isDone: true, user: { uuid: createPhysiognomyDto.user_id } });
     }
 
-    return dataObj;
-  }
-  async findOne(uuid: string) {
-    console.log('PhysiognomyService.findOne uuid:', uuid);
-
-    const result = await this.physiognomyRepository.findOne({ where: { user: { uuid: uuid } } });
-
-    if (!result) {
-      throw new NotFoundException(`해당 ID에 해당하는 관상 분석 결과를 찾을 수 없습니다.`);
-    }
-
-    return { physiognomy: result?.data };
   }
 }
+
