@@ -6,7 +6,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiOperation, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import 'multer';
 
-@Controller('physiognomy')
+@Controller('api/physiognomy')
 export class PhysiognomyController {
   constructor(private readonly physiognomyService: PhysiognomyService) { }
 
@@ -17,7 +17,7 @@ export class PhysiognomyController {
     schema: {
       type: 'object',
       properties: {
-        uuid: {
+        user_id: {
           type: 'string',
           description: '사용자 uuid',
           example: 'user-uuid-123',
@@ -27,7 +27,7 @@ export class PhysiognomyController {
           format: 'binary',
         },
       },
-      required: ['uuid', 'image'], // uuid와 image 모두 필수
+      required: ['user_id', 'image'], // user_id와 image 모두 필수
     },
   })
   @UseInterceptors(FileInterceptor('image'))
@@ -42,8 +42,8 @@ export class PhysiognomyController {
     return this.physiognomyService.create(createPhysiognomyDto, image);
   }
 
-  @Get(':uuid')
-  findOne(@Param('uuid') uuid: string) {
-    return this.physiognomyService.findOne(uuid);
+  @Get(':user_id')
+  findOne(@Param('user_id') user_id: string) {
+    return this.physiognomyService.findOne(user_id);
   }
 }

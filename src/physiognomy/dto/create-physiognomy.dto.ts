@@ -8,5 +8,5 @@ export class CreatePhysiognomyDto {
     })
     @IsString()
     @IsNotEmpty()
-    uuid!: string;
+    user_id!: string;
 }

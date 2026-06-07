@@ -7,7 +7,7 @@ import { GenderDescription } from './enums/gender.enum';
 import { BirthTimeDescription } from './enums/birth-time.enum';
 import { ApiOperation, ApiConsumes, ApiBody } from '@nestjs/swagger';
 
-@Controller('saju')
+@Controller('api/saju')
 export class SajuController {
   constructor(private readonly sajuService: SajuService) { }
 
