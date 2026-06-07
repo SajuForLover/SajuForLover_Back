@@ -180,6 +180,18 @@ export class CharacterService {
             throw new BadRequestException('userId가 필요합니다.');
         }
 
+        // 1. 기존 분석 결과가 있는지 먼저 확인
+        const existing = await this.findCompatibilityByUserId(userId);
+        if (existing) {
+            return {
+                characterId: existing.characterId,
+                characterName: existing.characterName,
+                overallScore: existing.overallScore,
+                badgeScores: existing.badgeScores,
+                sections: existing.sections,
+            };
+        }
+
         const [physiognomyRecord, sajuRecord] = await Promise.all([
             this.physiognomyRepository.findOne({
                 where: { user: { uuid: userId } },
