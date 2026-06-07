@@ -19,16 +19,6 @@ export class CreateCompatibilityDto {
   @IsString()
   gender?: string;
 
-  @ApiPropertyOptional({ description: '사주 데이터' })
-  @IsOptional()
-  @IsObject()
-  saju?: any;
-
-  @ApiPropertyOptional({ description: '관상 데이터' })
-  @IsOptional()
-  @IsObject()
-  physiognomy?: any;
-
   @ApiPropertyOptional({ type: CompatibilityOptionsDto, description: '추가 옵션' })
   @IsOptional()
   @ValidateNested()

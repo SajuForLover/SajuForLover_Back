@@ -12,6 +12,7 @@ export class CharacterController {
   async create(@Body() createCompatibilityDto: CreateCompatibilityDto) {
     const result = await this.characterService.create(createCompatibilityDto);
     return {
+      characterId: result?.characterId || null,
       characterName: result?.characterName || null,
       overallScore: result?.overallScore ?? null,
       badgeScores: result?.badgeScores ?? null,

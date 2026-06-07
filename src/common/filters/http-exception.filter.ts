@@ -1,10 +1,13 @@
-import { ExceptionFilter, Catch, ArgumentsHost, HttpException, HttpStatus } from '@nestjs/common';
+import { ExceptionFilter, Catch, ArgumentsHost, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { Request, Response } from 'express';
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
+    private readonly logger = new Logger(HttpExceptionFilter.name);
+
     catch(exception: unknown, host: ArgumentsHost) {
         const ctx = host.switchToHttp();
+        const request = ctx.getRequest?.<Request>();
         const response = ctx.getResponse<Response>();
 
         const isHttpException = exception instanceof HttpException;
@@ -13,6 +16,17 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
         const message = this.resolveMessage(exception, errorResponse);
         const code = this.resolveCode(status, exception);
+        const reason = this.resolveReason(errorResponse, message);
+        const stack = exception instanceof Error ? exception.stack : undefined;
+        const method = request?.method ?? 'UNKNOWN';
+        const url = request?.url ?? 'UNKNOWN';
+        const logMessage = `[${method} ${url}] ${message}`;
+
+        if (status >= HttpStatus.INTERNAL_SERVER_ERROR) {
+            this.logger.error(logMessage, stack);
+        } else {
+            this.logger.warn(logMessage);
+        }
 
         response.status(status).json({
             success: false,
@@ -20,6 +34,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
             error: {
                 code,
                 message,
+                reason,
                 timestamp: new Date().toISOString(),
             },
         });
@@ -48,6 +63,27 @@ export class HttpExceptionFilter implements ExceptionFilter {
         }
 
         return '서버 처리 중 오류가 발생했습니다.';
+    }
+
+    private resolveReason(errorResponse: unknown, message: string) {
+        if (typeof errorResponse === 'string') {
+            return errorResponse;
+        }
+
+        if (errorResponse && typeof errorResponse === 'object') {
+            const response = errorResponse as Record<string, unknown>;
+            const reason = response.reason;
+
+            if (Array.isArray(reason)) {
+                return reason.join(', ');
+            }
+
+            if (typeof reason === 'string') {
+                return reason;
+            }
+        }
+
+        return message;
     }
 
     private resolveCode(status: number, exception: unknown) {

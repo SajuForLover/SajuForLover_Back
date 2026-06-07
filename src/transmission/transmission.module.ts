@@ -5,9 +5,10 @@ import { TransmissionController } from './transmission.controller';
 import { User } from '@/user/entities/user.entity';
 import { Saju } from '@/saju/entities/saju.entity';
 import { Physiognomy } from '@/physiognomy/entities/physiognomy.entity';
+import { Compatibility } from '@/character/entities/compatibility.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User, Saju, Physiognomy])],
+  imports: [TypeOrmModule.forFeature([User, Saju, Physiognomy, Compatibility])],
   controllers: [TransmissionController],
   providers: [TransmissionService],
 })
