@@ -10,6 +10,7 @@ export class CharacterController {
   @Post()
   @HttpCode(200)
   async create(@Body() createCompatibilityDto: CreateCompatibilityDto) {
+    console.log('CharacterController.create, dto:', JSON.stringify(createCompatibilityDto));
     const result = await this.characterService.create(createCompatibilityDto);
     return {
       characterId: result?.characterId || null,
@@ -27,6 +28,7 @@ export class CharacterController {
 
   @Get(':userId')
   async findOne(@Param('userId') userId: string) {
+    console.log('CharacterController.findOne userId:', userId);
     const result = await this.characterService.findCompatibilityByUserId(userId);
     if (!result) return null;
     return {
