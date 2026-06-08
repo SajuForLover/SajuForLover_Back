@@ -126,16 +126,16 @@ export class TransmissionService {
           .header { background: linear-gradient(135deg, #ff758c 0%, #ff7eb3 100%); color: white; padding: 40px 20px; text-align: center; }
           .header h1 { font-size: 32px; margin-bottom: 8px; letter-spacing: -1px; }
           .header p { font-size: 16px; opacity: 0.9; font-weight: 300; }
-          .content { padding: 30px 24px; }
+          .content { padding: 30px 20px; }
           
-          .section { margin-bottom: 35px; }
-          .section-title { font-size: 20px; font-weight: 800; color: #ff758c; margin-bottom: 18px; display: flex; align-items: center; }
-          .section-title::after { content: ''; flex: 1; height: 1px; background: #eee; margin-left: 15px; }
+          .section { margin-bottom: 25px; }
+          .section-title { font-size: 18px; font-weight: 800; color: #ff758c; margin-bottom: 15px; display: flex; align-items: center; }
+          .section-title::after { content: ''; flex: 1; height: 1px; background: #eee; margin-left: 10px; }
           
-          .card { background: #fff; border: 1px solid #f0f0f0; border-radius: 12px; padding: 20px; margin-bottom: 15px; }
-          .user-info { background: #fff5f7; padding: 20px; border-radius: 12px; margin-bottom: 30px; border: 1px dashed #ffb2c1; }
-          .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-          .info-item { font-size: 14px; margin-bottom: 5px; }
+          .card { background: #fff; border: 1px solid #f0f0f0; border-radius: 12px; padding: 18px; margin-bottom: 16px; }
+          .user-info { background: #fff5f7; padding: 20px; border-radius: 12px; margin-bottom: 25px; border: 1px dashed #ffb2c1; }
+          .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+          .info-item { font-size: 14px; margin-bottom: 8px; }
           .info-label { font-weight: bold; color: #ff758c; width: 80px; display: inline-block; }
           
           /* Saju Profile */
@@ -148,12 +148,12 @@ export class TransmissionService {
           
           /* Five Elements */
           .element-row { margin-bottom: 12px; }
-          .element-info { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 13px; font-weight: 600; }
+          .element-info { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 13px; font-weight: 600; gap: 10px; }
           .progress-bg { background: #eee; height: 8px; border-radius: 4px; overflow: hidden; }
           .progress-bar { height: 100%; border-radius: 4px; }
           
           /* Stats */
-          .stat-item { margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid #f9f9f9; }
+          .stat-item { margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #f9f9f9; }
           .stat-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
           .stat-name { font-weight: bold; font-size: 15px; }
           .stat-score { color: #ff758c; font-weight: 800; font-size: 18px; }
@@ -343,18 +343,18 @@ export class TransmissionService {
                     <div style="font-size: 48px; font-weight: 800; color: #ff758c;">${compatibility.overallScore}<span style="font-size: 20px;">점</span></div>
                   </div>
 
-                  <div style="display: flex; justify-content: space-around; margin-bottom: 25px;">
-                    <div style="text-align: center;">
-                      <div style="font-size: 11px; color: #999;">사주 궁합</div>
-                      <div style="font-weight: bold; color: #333;">${compatibility.badgeScores?.sajuCompatibility || 0}점</div>
+                  <div style="display: flex; justify-content: space-between; margin: 0 10px 25px 10px;">
+                    <div style="text-align: center; flex: 1;">
+                      <div style="font-size: 11px; color: #999; margin-bottom: 3px;">사주 궁합</div>
+                      <div style="font-weight: bold; color: #333; font-size: 15px;">${compatibility.badgeScores?.sajuCompatibility || 0}점</div>
                     </div>
-                    <div style="text-align: center;">
-                      <div style="font-size: 11px; color: #999;">연애 스타일</div>
-                      <div style="font-weight: bold; color: #333;">${compatibility.badgeScores?.datingStyle || 0}점</div>
+                    <div style="text-align: center; flex: 1; border-left: 1px solid #eee; border-right: 1px solid #eee;">
+                      <div style="font-size: 11px; color: #999; margin-bottom: 3px;">연애 스타일</div>
+                      <div style="font-weight: bold; color: #333; font-size: 15px;">${compatibility.badgeScores?.datingStyle || 0}점</div>
                     </div>
-                    <div style="text-align: center;">
-                      <div style="font-size: 11px; color: #999;">가치관 호응</div>
-                      <div style="font-weight: bold; color: #333;">${compatibility.badgeScores?.preferencePersonality || 0}점</div>
+                    <div style="text-align: center; flex: 1;">
+                      <div style="font-size: 11px; color: #999; margin-bottom: 3px;">가치관 호응</div>
+                      <div style="font-weight: bold; color: #333; font-size: 15px;">${compatibility.badgeScores?.preferencePersonality || 0}점</div>
                     </div>
                   </div>
 
