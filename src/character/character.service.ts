@@ -436,8 +436,10 @@ export class CharacterService {
         }
     }
 
-    async findCompatibilityByUserId(userId: string): Promise<Compatibility | null> {
-        return this.compatibilityRepository.findOne({ where: { userId } });
+    async findCompatibilityByUserId(userId: string) {
+        const existing = await this.compatibilityRepository.findOne({ where: { userId } });
+        if (existing) return existing;
+        else throw new NotFoundException('해당 사용자의 캐릭터 궁합 분석 결과를 찾을 수 없습니다. 현재 분석 중이거나, 아직 분석되지 않았습니다.');
     }
 
     findAll() {
