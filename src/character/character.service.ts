@@ -174,9 +174,11 @@ export class CharacterService {
 
     // 기존 캐릭터 생성은 이제 호환성 분석용 POST로 재사용됩니다.
     async create(createCompatibilityDto: CreateCompatibilityDto): Promise<CompatibilityResultDto | any> {
+        console.log('CharacterService.create 호출됨, dto:', JSON.stringify(createCompatibilityDto));
         const userId = createCompatibilityDto.userId;
 
         if (!userId) {
+            console.error('CharacterService.create 실패: userId 없음');
             throw new BadRequestException('userId가 필요합니다.');
         }
 
@@ -192,207 +194,141 @@ export class CharacterService {
             };
         }
 
-        const [physiognomyRecord, sajuRecord] = await Promise.all([
-            this.physiognomyRepository.findOne({
-                where: { user: { uuid: userId } },
-                order: { createdAt: 'DESC' },
-            }),
-            this.sajuRepository.findOne({
-                where: { user: { uuid: userId } },
-                order: { createdAt: 'DESC' },
-            }),
-        ]);
+        // 2. 분석 중인 상태를 나타내는 레코드 즉시 생성 (이미 있으면 덮어씌움 - upsert)
+        const pendingRecord = {
+            userId: userId,
+            characterId: 'pending',
+            characterName: '분석 중...',
+            overallScore: 0,
+            badgeScores: { sajuCompatibility: 0, datingStyle: 0, preferencePersonality: 0 },
+            sections: { destiny: '', personality: '', elemental: '', dating: '', growth: '' }
+        };
+        await this.compatibilityRepository.upsert(pendingRecord, ['userId']);
 
-        const physiognomy = physiognomyRecord ? resolvePhysiognomyData(physiognomyRecord) : null;
-        const saju = sajuRecord ? resolveSajuData(sajuRecord) : null;
+        // 3. 백그라운드에서 분석 실행
+        this.runAnalysisInBackground(userId);
 
-        if (!saju && !physiognomy) {
-            throw new NotFoundException('해당 사용자의 사주 또는 관상 정보를 찾을 수 없습니다.');
-        }
+        return pendingRecord;
+    }
 
-        let userGender = normalizeGender(createCompatibilityDto.gender)
-            || normalizeGender(saju?.gender)
-            || normalizeGender(saju?.profile?.gender);
-
-        if (!userGender && userId) {
-            const userRow = await this.userRepository.findOne({ where: { uuid: userId } });
-            userGender = normalizeGender(userRow?.gender);
-        }
-
-        const targetGender = oppositeGender(userGender);
-        const candidateCharacters = targetGender
-            ? CHARACTERS_META.filter((meta) => meta.gender === targetGender)
-            : CHARACTERS_META;
-
-        // 사용자 정보에서 가능한 필드 추출
-        const userElement = extractUserElement(saju, physiognomy);
-        const userElementRatios = buildElementRatioMap(saju);
-        const physTags: string[] = extractPhysiognomyTags(physiognomy);
-
-        // 간단한 점수화: 오행 일치/상생/상극 및 관상 태그 겹침
-        const nextElement: Record<string, string> = { wood: 'fire', fire: 'earth', earth: 'metal', metal: 'water', water: 'wood' };
-        const prevElement: Record<string, string> = { wood: 'water', fire: 'wood', earth: 'fire', metal: 'earth', water: 'metal' };
-
-        const scored: Array<{ meta: CharacterMeta; score: number; sajuScore: number; datingScore: number; personalityScore: number; reasons: string[] }> = candidateCharacters.map((meta) => {
-            let sajuScore = 0;
-            let datingScore = 0;
-            let personalityScore = 0;
-            const reasons: string[] = [];
-
-            // sajuCompatibility: 오행 일치 + 오행 비율 보정
-            if (userElement && meta.dominantElement) {
-                if (userElement === meta.dominantElement) {
-                    sajuScore += 30;
-                    reasons.push('비슷한 오행을 가져 공감대가 큽니다.');
-                } else if (nextElement[userElement] === meta.dominantElement) {
-                    sajuScore += 20;
-                    reasons.push('유저의 기운이 캐릭터의 기운을 자연스럽게 보완합니다.');
-                } else if (prevElement[userElement] === meta.dominantElement) {
-                    sajuScore += 8;
-                    reasons.push('오행상 보완이 필요한 관계로 천천히 맞춰갈 수 있습니다.');
-                }
-            }
-
-            const dominantRatio = userElementRatios[meta.dominantElement] ?? 0;
-            if (dominantRatio > 0) {
-                const ratioScore = Math.min(20, Math.round(dominantRatio * 0.5));
-                if (ratioScore > 0) {
-                    sajuScore += ratioScore;
-                    reasons.push(`주 오행 비율(${meta.dominantElement}) 반영 점수 ${ratioScore}점이 부여되었습니다.`);
-                }
-            }
-
-            // datingStyle: 관상 태그 매칭
-            const metaTagsNorm = (meta.physiognomyTags || []).map(toCanonicalTag).filter(Boolean);
-            const physTagsNorm = (physTags || []).map(normalizeTag).filter(Boolean);
-            const overlap = metaTagsNorm.filter((t) => {
-                if (physTagsNorm.includes(t)) return true;
-                return physTagsNorm.some((p) => p.includes(t) || t.includes(p));
-            }).length;
-            if (overlap > 0) {
-                datingScore += Math.min(30, overlap * 10);
-                reasons.push(`${overlap}개의 관상 태그가 일치해 친밀감이 빠르게 형성됩니다.`);
-            }
-
-            // preferencePersonality: 성격 키워드 어간 매칭 (sajuNotes + personality + 오행 특성 포함)
-            const fiveElementsChars = resolveFiveElements(saju)
-                .map((e: any) => e?.characteristics)
-                .filter(Boolean);
-
-            const userPersonalityText = [
-                saju?.profile?.core_description,
-                saju?.profile?.nickname,
-                saju?.profile?.soul_title,
-                ...(Array.isArray(saju?.profile?.matching_mbti) ? saju.profile.matching_mbti : []),
-                saju?.career?.work_style,
-                saju?.career?.warning_note,
-                ...(Array.isArray(saju?.career?.recommended_jobs) ? saju.career.recommended_jobs : []),
-                saju?.fortune?.best_partner,
-                saju?.fortune?.worst_partner,
-                ...(Array.isArray(saju?.stats) ? saju.stats.map((s: any) => s.status_description) : []),
-                saju?.notes,
-                physiognomy?.summary_advice,
-                physiognomy?.overall_analysis?.impression,
-                ...fiveElementsChars,
-            ]
-                .filter(Boolean)
-                .join(' ');
-
-            const userPersonalityStems = extractStems(userPersonalityText);
-            const charPersonalityStems = extractStems([meta.personality, meta.sajuNotes].filter(Boolean).join(' '));
-
-            const personalityMatchCount = charPersonalityStems.filter((cs) =>
-                userPersonalityStems.some(
-                    (us) =>
-                        us === cs ||
-                        us.includes(cs) ||
-                        cs.includes(us) ||
-                        (cs.length >= 2 && us.startsWith(cs.slice(0, 2))) ||
-                        (us.length >= 2 && cs.startsWith(us.slice(0, 2))),
-                ),
-            ).length;
-
-            if (personalityMatchCount >= 1) {
-                personalityScore += Math.min(20, personalityMatchCount * 4);
-                reasons.push(`성격 키워드 ${personalityMatchCount}개가 일치해 소통이 원활할 가능성이 있습니다.`);
-            }
-
-            const score = sajuScore + datingScore + personalityScore;
-
-            // 기본 보정: 모든 가중치가 0일 때, 사주/관상 정보가 있으면 최소 점수 부여
-            if (score <= 0) {
-                if (userElement) {
-                    sajuScore += 15;
-                    reasons.push('사주 요소 정보 기반으로 기본 점수가 부여되었습니다.');
-                }
-                if (physTagsNorm && physTagsNorm.length > 0) {
-                    const add = Math.min(20, physTagsNorm.length * 7);
-                    datingScore += add;
-                    reasons.push(`${physTagsNorm.length}개의 관상 단서로 보정 점수 ${add}점이 부여되었습니다.`);
-                }
-            }
-
-            return { meta, score: sajuScore + datingScore + personalityScore, sajuScore, datingScore, personalityScore, reasons };
-        });
-
-        // 디버그 로그: 사용자 추출 요소와 관상 태그 및 각 캐릭터별 점수
+    private async runAnalysisInBackground(userId: string) {
         try {
-            // eslint-disable-next-line no-console
-            console.log('CHARACTER SCORING DEBUG', {
-                userGender,
-                targetGender,
-                candidateCount: candidateCharacters.length,
-                userElement,
-                physTags,
-                scored: scored.map((s) => ({ id: s.meta.id, name: s.meta.name, score: s.score, reasons: s.reasons })),
+            const [physiognomyRecord, sajuRecord] = await Promise.all([
+                this.physiognomyRepository.findOne({
+                    where: { user: { uuid: userId } },
+                    order: { createdAt: 'DESC' },
+                }),
+                this.sajuRepository.findOne({
+                    where: { user: { uuid: userId } },
+                    order: { createdAt: 'DESC' },
+                }),
+            ]);
+
+            const physiognomy = physiognomyRecord ? resolvePhysiognomyData(physiognomyRecord) : null;
+            const saju = sajuRecord ? resolveSajuData(sajuRecord) : null;
+
+            if (!saju && !physiognomy) {
+                console.error(`분석 실패: 사주/관상 데이터 없음, userId: ${userId}`);
+                return;
+            }
+
+            let userGender = normalizeGender(saju?.gender) || normalizeGender(saju?.profile?.gender);
+
+            if (!userGender && userId) {
+                const userRow = await this.userRepository.findOne({ where: { uuid: userId } });
+                userGender = normalizeGender(userRow?.gender);
+            }
+
+            const targetGender = oppositeGender(userGender);
+            const candidateCharacters = targetGender
+                ? CHARACTERS_META.filter((meta) => meta.gender === targetGender)
+                : CHARACTERS_META;
+
+            const userElement = extractUserElement(saju, physiognomy);
+            const userElementRatios = buildElementRatioMap(saju);
+            const physTags: string[] = extractPhysiognomyTags(physiognomy);
+
+            const nextElement: Record<string, string> = { wood: 'fire', fire: 'earth', earth: 'metal', metal: 'water', water: 'wood' };
+            const prevElement: Record<string, string> = { wood: 'water', fire: 'wood', earth: 'fire', metal: 'earth', water: 'metal' };
+
+            const scored: Array<{ meta: CharacterMeta; score: number; sajuScore: number; datingScore: number; personalityScore: number; reasons: string[] }> = candidateCharacters.map((meta) => {
+                let sajuScore = 0;
+                let datingScore = 0;
+                let personalityScore = 0;
+                const reasons: string[] = [];
+
+                if (userElement && meta.dominantElement) {
+                    if (userElement === meta.dominantElement) {
+                        sajuScore += 30;
+                    } else if (nextElement[userElement] === meta.dominantElement) {
+                        sajuScore += 20;
+                    } else if (prevElement[userElement] === meta.dominantElement) {
+                        sajuScore += 8;
+                    }
+                }
+
+                const dominantRatio = userElementRatios[meta.dominantElement] ?? 0;
+                if (dominantRatio > 0) {
+                    sajuScore += Math.min(20, Math.round(dominantRatio * 0.5));
+                }
+
+                const metaTagsNorm = (meta.physiognomyTags || []).map(toCanonicalTag).filter(Boolean);
+                const physTagsNorm = (physTags || []).map(normalizeTag).filter(Boolean);
+                const overlap = metaTagsNorm.filter((t) => physTagsNorm.includes(t) || physTagsNorm.some((p) => p.includes(t) || t.includes(p))).length;
+                if (overlap > 0) {
+                    datingScore += Math.min(30, overlap * 10);
+                }
+
+                const fiveElementsChars = resolveFiveElements(saju).map((e: any) => e?.characteristics).filter(Boolean);
+                const userPersonalityText = [
+                    saju?.profile?.core_description,
+                    saju?.profile?.nickname,
+                    saju?.profile?.soul_title,
+                    ...(Array.isArray(saju?.profile?.matching_mbti) ? saju.profile.matching_mbti : []),
+                    saju?.career?.work_style,
+                    saju?.career?.warning_note,
+                    ...(Array.isArray(saju?.career?.recommended_jobs) ? saju.career.recommended_jobs : []),
+                    saju?.fortune?.best_partner,
+                    saju?.fortune?.worst_partner,
+                    ...(Array.isArray(saju?.stats) ? saju.stats.map((s: any) => s.status_description) : []),
+                    saju?.notes,
+                    physiognomy?.summary_advice,
+                    physiognomy?.overall_analysis?.impression,
+                    ...fiveElementsChars,
+                ].filter(Boolean).join(' ');
+
+                const userPersonalityStems = extractStems(userPersonalityText);
+                const charPersonalityStems = extractStems([meta.personality, meta.sajuNotes].filter(Boolean).join(' '));
+
+                const personalityMatchCount = charPersonalityStems.filter((cs) => userPersonalityStems.some((us) => us === cs || us.includes(cs) || cs.includes(us) || (cs.length >= 2 && us.startsWith(cs.slice(0, 2))) || (us.length >= 2 && cs.startsWith(us.slice(0, 2))))).length;
+
+                if (personalityMatchCount >= 1) {
+                    personalityScore += Math.min(20, personalityMatchCount * 4);
+                }
+
+                return { meta, score: sajuScore + datingScore + personalityScore, sajuScore, datingScore, personalityScore, reasons };
             });
-        } catch (e) {
-            // ignore logging errors
-        }
 
-        // 모든 캐릭터에 대해 점수 기준으로 정렬한 뒤, AI가 5개 섹션 문단을 생성합니다.
-        scored.sort((a, b) => b.score - a.score);
-
-        const best = scored[0];
-        if (!best) {
-            throw new NotFoundException('적합한 캐릭터를 찾을 수 없습니다.');
-        }
-
-        const apiKey = this.getApiKey();
-        if (!apiKey) {
-            throw new NotFoundException('GEMINI_API_KEY 또는 GOOGLE_API_KEY가 없어 문단을 생성할 수 없습니다.');
-        }
-
-        const userSummary = `사용자 사주: ${saju ? JSON.stringify({ dominantElement: extractUserElement(saju, physiognomy), profile: saju.profile, five_elements: saju.five_elements }) : '없음'}; 관상: ${physiognomy ? JSON.stringify({ tags: extractPhysiognomyTags(physiognomy), summary: physiognomy.summary_advice, overall_analysis: physiognomy.overall_analysis }) : '없음'}`;
-        const prompt = `당신은 한국어 궁합 문구를 쓰는 작가입니다. 아래 캐릭터와 사용자 정보를 바탕으로, 반드시 JSON 객체만 출력하세요.
-
+            scored.sort((a, b) => b.score - a.score);
+            const best = scored[0];
+            
+            const userSummary = `사용자 사주: ${saju ? JSON.stringify({ dominantElement: extractUserElement(saju, physiognomy), profile: saju.profile, five_elements: saju.five_elements }) : '없음'}; 관상: ${physiognomy ? JSON.stringify({ tags: extractPhysiognomyTags(physiognomy), summary: physiognomy.summary_advice, overall_analysis: physiognomy.overall_analysis }) : '없음'}`;
+            const prompt = `당신은 한국어 궁합 문구를 쓰는 작가입니다. 아래 캐릭터와 사용자 정보를 바탕으로, 반드시 JSON 객체만 출력하세요.
 반드시 포함할 키: destiny, personality, elemental, dating, growth
 각 값은 3~5문장 정도의 자연스러운 문단이어야 합니다.
-문장 톤은 과장된 점괘 말투가 아니라, 실제 서비스 결과처럼 부드럽고 설득력 있게 써주세요.
 출력에는 설명 문장, 코드블록, 마크다운, 추가 텍스트를 절대 넣지 마세요.
-
 캐릭터: ${JSON.stringify(best.meta)}
 사용자 요약: ${userSummary}`;
 
-        console.log('캐릭터 분석 시작:', new Date().toISOString());
-        try {
+            console.log('캐릭터 궁합 - AI 요청 시작 시간:', new Date().toISOString());
             const aiResp = await this.ai.models.generateContent({
                 model: 'gemma-4-26b-a4b-it',
-                contents: [
-                    {
-                        role: 'user',
-                        parts: [{ text: prompt }],
-                    },
-                ],
+                contents: [{ role: 'user', parts: [{ text: prompt }] }],
             });
-            console.log('캐릭터 분석 완료:', new Date().toISOString());
+            console.log('캐릭터 궁합 - AI 응답 수신 시간:', new Date().toISOString());
 
             const parsed = JSON.parse((aiResp.text || '{}').replace(/```json/g, '').replace(/```/g, '').trim());
-            if (!parsed?.destiny || !parsed?.personality || !parsed?.elemental || !parsed?.dating || !parsed?.growth) {
-                throw new Error('AI response is missing required sections');
-            }
-
-            // 각 배지를 0~100으로 정규화 후 기본 72점 부여 (데이터가 있는 것 자체가 궁합 근거)
+            
             const MAX_SAJU = 50;
             const MAX_DATING = 30;
             const MAX_PERSONALITY = 20;
@@ -404,17 +340,17 @@ export class CharacterService {
             const normPersonality = BASE + Math.round((Math.min(best.personalityScore, MAX_PERSONALITY) / MAX_PERSONALITY) * RANGE);
 
             const overall = Math.round((normSaju + normDating + normPersonality) / 3);
-            const badges = {
-                sajuCompatibility: normSaju,
-                datingStyle: normDating,
-                preferencePersonality: normPersonality,
-            };
 
-            const compatibilityResult = {
+            await this.compatibilityRepository.save({
+                userId: userId,
                 characterId: best.meta.id,
                 characterName: best.meta.name,
                 overallScore: overall,
-                badgeScores: badges,
+                badgeScores: {
+                    sajuCompatibility: normSaju,
+                    datingStyle: normDating,
+                    preferencePersonality: normPersonality,
+                },
                 sections: {
                     destiny: parsed.destiny,
                     personality: parsed.personality,
@@ -422,24 +358,15 @@ export class CharacterService {
                     dating: parsed.dating,
                     growth: parsed.growth,
                 },
-            };
-
-            // DB에 저장 (사용자 uuid를 PK로 사용하므로 기존 데이터가 있으면 덮어씌움)
-            await this.compatibilityRepository.save({
-                userId: userId,
-                ...compatibilityResult,
             });
-
-            return compatibilityResult as any;
+            console.log(`분석 완료: userId ${userId}`);
         } catch (err) {
-            throw new NotFoundException('AI로 문단을 생성하지 못했습니다. 잠시 후 다시 시도해 주세요.');
+            console.error(`분석 에러: userId ${userId}`, err);
         }
     }
 
     async findCompatibilityByUserId(userId: string) {
-        const existing = await this.compatibilityRepository.findOne({ where: { userId } });
-        if (existing) return existing;
-        else throw new NotFoundException('해당 사용자의 캐릭터 궁합 분석 결과를 찾을 수 없습니다. 현재 분석 중이거나, 아직 분석되지 않았습니다.');
+        return await this.compatibilityRepository.findOne({ where: { userId } });
     }
 
     findAll() {
