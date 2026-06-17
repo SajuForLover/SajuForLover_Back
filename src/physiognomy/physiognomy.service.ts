@@ -82,23 +82,33 @@ export class PhysiognomyService {
         }
       `;
 
+    const PRIMARY_MODEL = 'gemini-3.1-flash-lite-preview';
+    const FALLBACK_MODEL = 'gemma-4-31b-it';
+    const contents = [
+      {
+        role: 'user',
+        parts: [
+          { text: prompt },
+          { inlineData: { mimeType: mimeType, data: base64Data } },
+        ],
+      },
+    ];
+
     const start = new Date();
     console.log('관상 - AI 요청 시작 시간:', start.toISOString());
-    const response = await this.ai.models.generateContent({
-      model: 'gemini-3.1-flash-lite-preview',
-      contents: [
-        {
-          role: 'user',
-          parts: [
-            { text: prompt },
-            { inlineData: { mimeType: mimeType, data: base64Data } },
-          ],
-        },
-      ],
-      config: {
-        responseMimeType: 'application/json',
-      }
-    });
+    let response: Awaited<ReturnType<typeof this.ai.models.generateContent>>;
+    try {
+      response = await this.ai.models.generateContent({
+        model: PRIMARY_MODEL,
+        contents,
+        config: { responseMimeType: 'application/json' },
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`관상 - 기본 모델(${PRIMARY_MODEL}) 에러: ${msg}`);
+      console.warn(`관상 - fallback 모델(${FALLBACK_MODEL}) 사용`);
+      response = await this.ai.models.generateContent({ model: FALLBACK_MODEL, contents });
+    }
     const end = new Date();
     console.log('관상 - AI 응답 완료 시간:', end.toISOString());
     console.log(`관상 - AI 응답 시간: ${(end.getTime() - start.getTime()) / 1000}초`);
