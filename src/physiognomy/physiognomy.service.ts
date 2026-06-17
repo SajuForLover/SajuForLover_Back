@@ -3,6 +3,7 @@ import { CreatePhysiognomyDto } from './dto/create-physiognomy.dto';
 import { UpdatePhysiognomyDto } from './dto/update-physiognomy.dto';
 import { GoogleGenAI } from '@google/genai';
 import { ConfigService } from '@nestjs/config';
+import { callOpenRouterWithImage } from '@/common/openrouter.helper';
 import { Physiognomy } from './entities/physiognomy.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -139,12 +140,23 @@ export class PhysiognomyService {
       }
     }
 
-    if (!response) throw lastErr ?? new Error('관상 AI 모델 요청 실패');
+    let rawText: string = response ? (response.text || '') : '';
+
+    if (!rawText) {
+      const openRouterKey = this.configService.get<string>('OPENROUTER_API_KEY');
+      if (openRouterKey) {
+        console.warn('관상 - Google 모델 전부 실패, OpenRouter(openai/gpt-oss-120b:free) 시도');
+        rawText = await callOpenRouterWithImage(openRouterKey, 'openai/gpt-oss-120b:free', prompt, mimeType, base64Data);
+      } else {
+        throw lastErr ?? new Error('관상 AI 모델 요청 실패');
+      }
+    }
+
     const end = new Date();
     console.log('관상 - AI 응답 완료 시간:', end.toISOString());
     console.log(`관상 - AI 응답 시간: ${(end.getTime() - start.getTime()) / 1000}초`);
 
-    const data = response.text || '{}';
+    const data = rawText || '{}';
     const dataObj = JSON.parse(data);
     if (await this.physiognomyRepository.findOne({ where: { user: { uuid: createPhysiognomyDto.user_id } } })) {
       await this.physiognomyRepository.update({ user: { uuid: createPhysiognomyDto.user_id } }, { data: dataObj, isDone: true });
