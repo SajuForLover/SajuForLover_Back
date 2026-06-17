@@ -93,22 +93,53 @@ export class PhysiognomyService {
         ],
       },
     ];
+    const sleep = (ms: number) => new Promise<void>(res => setTimeout(res, ms));
+    const RETRY_DELAY_MS = 2000;
+    const MAX_RETRIES = 3;
+    const isRetryable = (msg: string) =>
+      msg.includes('500') || msg.includes('503') || msg.includes('UNAVAILABLE') || msg.includes('INTERNAL') || msg.includes('high demand');
 
     const start = new Date();
     console.log('관상 - AI 요청 시작 시간:', start.toISOString());
-    let response: Awaited<ReturnType<typeof this.ai.models.generateContent>>;
-    try {
-      response = await this.ai.models.generateContent({
-        model: PRIMARY_MODEL,
-        contents,
-        config: { responseMimeType: 'application/json' },
-      });
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.warn(`관상 - 기본 모델(${PRIMARY_MODEL}) 에러: ${msg}`);
-      console.warn(`관상 - fallback 모델(${FALLBACK_MODEL}) 사용`);
-      response = await this.ai.models.generateContent({ model: FALLBACK_MODEL, contents });
+    let response: Awaited<ReturnType<typeof this.ai.models.generateContent>> | undefined;
+    let lastErr: unknown;
+
+    for (let attempt = 1; attempt <= MAX_RETRIES && !response; attempt++) {
+      try {
+        response = await this.ai.models.generateContent({
+          model: PRIMARY_MODEL,
+          contents,
+          config: { responseMimeType: 'application/json' },
+        });
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (!isRetryable(msg)) throw err;
+        lastErr = err;
+        if (attempt < MAX_RETRIES) {
+          console.warn(`관상 - 기본 모델(${PRIMARY_MODEL}) 에러, ${attempt}/${MAX_RETRIES} 재시도 중... (${RETRY_DELAY_MS * attempt}ms 후)`);
+          await sleep(RETRY_DELAY_MS * attempt);
+        }
+      }
     }
+
+    if (!response) {
+      console.warn(`관상 - 기본 모델(${PRIMARY_MODEL}) 실패, fallback(${FALLBACK_MODEL}) 시도`);
+      for (let attempt = 1; attempt <= MAX_RETRIES && !response; attempt++) {
+        try {
+          response = await this.ai.models.generateContent({ model: FALLBACK_MODEL, contents });
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          if (!isRetryable(msg)) throw err;
+          lastErr = err;
+          if (attempt < MAX_RETRIES) {
+            console.warn(`관상 - fallback 모델(${FALLBACK_MODEL}) 에러, ${attempt}/${MAX_RETRIES} 재시도 중... (${RETRY_DELAY_MS * attempt}ms 후)`);
+            await sleep(RETRY_DELAY_MS * attempt);
+          }
+        }
+      }
+    }
+
+    if (!response) throw lastErr ?? new Error('관상 AI 모델 요청 실패');
     const end = new Date();
     console.log('관상 - AI 응답 완료 시간:', end.toISOString());
     console.log(`관상 - AI 응답 시간: ${(end.getTime() - start.getTime()) / 1000}초`);
