@@ -320,11 +320,23 @@ export class CharacterService {
 캐릭터: ${JSON.stringify(best.meta)}
 사용자 요약: ${userSummary}`;
 
+            const PRIMARY_MODEL = 'gemma-4-26b-a4b-it';
+            const FALLBACK_MODEL = 'gemma-4-31b-it';
+            const contents = [{ role: 'user', parts: [{ text: prompt }] }];
+
             console.log('캐릭터 궁합 - AI 요청 시작 시간:', new Date().toISOString());
-            const aiResp = await this.ai.models.generateContent({
-                model: 'gemma-4-26b-a4b-it',
-                contents: [{ role: 'user', parts: [{ text: prompt }] }],
-            });
+            let aiResp: Awaited<ReturnType<typeof this.ai.models.generateContent>>;
+            try {
+                aiResp = await this.ai.models.generateContent({ model: PRIMARY_MODEL, contents });
+            } catch (err: unknown) {
+                const msg = err instanceof Error ? err.message : String(err);
+                if (msg.includes('503') || msg.includes('UNAVAILABLE') || msg.includes('high demand')) {
+                    console.warn(`캐릭터 궁합 - 기본 모델(${PRIMARY_MODEL}) 과부하, fallback(${FALLBACK_MODEL}) 사용`);
+                    aiResp = await this.ai.models.generateContent({ model: FALLBACK_MODEL, contents });
+                } else {
+                    throw err;
+                }
+            }
             console.log('캐릭터 궁합 - AI 응답 수신 시간:', new Date().toISOString());
 
             const parsed = JSON.parse((aiResp.text || '{}').replace(/```json/g, '').replace(/```/g, '').trim());
