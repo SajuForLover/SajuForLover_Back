@@ -330,8 +330,8 @@ export class CharacterService {
                 aiResp = await this.ai.models.generateContent({ model: PRIMARY_MODEL, contents });
             } catch (err: unknown) {
                 const msg = err instanceof Error ? err.message : String(err);
-                if (msg.includes('503') || msg.includes('UNAVAILABLE') || msg.includes('high demand')) {
-                    console.warn(`캐릭터 궁합 - 기본 모델(${PRIMARY_MODEL}) 과부하, fallback(${FALLBACK_MODEL}) 사용`);
+                if (msg.includes('503') || msg.includes('UNAVAILABLE') || msg.includes('high demand') || msg.includes('500') || msg.includes('INTERNAL')) {
+                    console.warn(`캐릭터 궁합 - 기본 모델(${PRIMARY_MODEL}) 에러(${msg}), fallback(${FALLBACK_MODEL}) 사용`);
                     aiResp = await this.ai.models.generateContent({ model: FALLBACK_MODEL, contents });
                 } else {
                     throw err;
