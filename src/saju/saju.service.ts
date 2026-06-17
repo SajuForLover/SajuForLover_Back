@@ -142,19 +142,24 @@ export class SajuService {
       }
     }`;
 
+    const PRIMARY_MODEL = 'gemma-4-26b-a4b-it';
+    const FALLBACK_MODEL = 'gemma-4-31b-it';
+    const contents = [{ role: 'user', parts: [{ text: prompt }] }];
+
     const start = new Date();
     console.log('사주 - AI 요청 시작 시간:', start.toISOString());
-    const response = await this.ai.models.generateContent({
-      model: 'gemma-4-26b-a4b-it',
-      contents: [
-        {
-          role: 'user',
-          parts: [
-            { text: prompt },
-          ],
-        },
-      ],
-    });
+    let response: Awaited<ReturnType<typeof this.ai.models.generateContent>>;
+    try {
+      response = await this.ai.models.generateContent({ model: PRIMARY_MODEL, contents });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('503') || msg.includes('UNAVAILABLE') || msg.includes('high demand')) {
+        console.warn(`사주 - 기본 모델(${PRIMARY_MODEL}) 과부하, fallback(${FALLBACK_MODEL}) 사용`);
+        response = await this.ai.models.generateContent({ model: FALLBACK_MODEL, contents });
+      } else {
+        throw err;
+      }
+    }
     const end = new Date();
     console.log('사주 - AI 응답 완료 시간:', end.toISOString());
     console.log(`사주 - AI 응답 시간: ${(end.getTime() - start.getTime()) / 1000}초`);
