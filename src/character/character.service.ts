@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { GoogleGenAI } from '@google/genai';
 import { ConfigService } from '@nestjs/config';
+import { callOpenRouterText } from '@/common/openrouter.helper';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CreateCharacterDto } from './dto/create-character.dto';
@@ -314,11 +315,11 @@ export class CharacterService {
             
             const userSummary = `사용자 사주: ${saju ? JSON.stringify({ dominantElement: extractUserElement(saju, physiognomy), profile: saju.profile, five_elements: saju.five_elements }) : '없음'}; 관상: ${physiognomy ? JSON.stringify({ tags: extractPhysiognomyTags(physiognomy), summary: physiognomy.summary_advice, overall_analysis: physiognomy.overall_analysis }) : '없음'}`;
             const prompt = `당신은 한국어 궁합 문구를 쓰는 작가입니다. 아래 캐릭터와 사용자 정보를 바탕으로, 반드시 JSON 객체만 출력하세요.
-반드시 포함할 키: destiny, personality, elemental, dating, growth
-각 값은 3~5문장 정도의 자연스러운 문단이어야 합니다.
-출력에는 설명 문장, 코드블록, 마크다운, 추가 텍스트를 절대 넣지 마세요.
-캐릭터: ${JSON.stringify(best.meta)}
-사용자 요약: ${userSummary}`;
+                            반드시 포함할 키: destiny, personality, elemental, dating, growth
+                            각 값은 3~5문장 정도의 자연스러운 문단이어야 합니다.
+                            출력에는 설명 문장, 코드블록, 마크다운, 추가 텍스트를 절대 넣지 마세요.
+                            캐릭터: ${JSON.stringify(best.meta)}
+                            사용자 요약: ${userSummary}`;
 
             const PRIMARY_MODEL = 'gemma-4-26b-a4b-it';
             const FALLBACK_MODEL = 'gemma-4-31b-it';
@@ -364,10 +365,21 @@ export class CharacterService {
                 }
             }
 
-            if (!aiResp) throw lastErr ?? new Error('캐릭터 궁합 AI 모델 요청 실패');
+            let rawText: string = aiResp ? (aiResp.text || '') : '';
+
+            if (!rawText) {
+                const openRouterKey = this.configService.get<string>('OPENROUTER_API_KEY');
+                if (openRouterKey) {
+                    console.warn('캐릭터 궁합 - Google 모델 전부 실패, OpenRouter(openai/gpt-oss-120b:free) 시도');
+                    rawText = await callOpenRouterText(openRouterKey, 'openai/gpt-oss-120b:free', prompt);
+                } else {
+                    throw lastErr ?? new Error('캐릭터 궁합 AI 모델 요청 실패');
+                }
+            }
+
             console.log('캐릭터 궁합 - AI 응답 수신 시간:', new Date().toISOString());
 
-            const parsed = JSON.parse((aiResp.text || '{}').replace(/```json/g, '').replace(/```/g, '').trim());
+            const parsed = JSON.parse((rawText || '{}').replace(/```json/g, '').replace(/```/g, '').trim());
             
             const MAX_SAJU = 50;
             const MAX_DATING = 30;
