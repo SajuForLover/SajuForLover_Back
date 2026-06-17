@@ -323,20 +323,48 @@ export class CharacterService {
             const PRIMARY_MODEL = 'gemma-4-26b-a4b-it';
             const FALLBACK_MODEL = 'gemma-4-31b-it';
             const contents = [{ role: 'user', parts: [{ text: prompt }] }];
+            const sleep = (ms: number) => new Promise<void>(res => setTimeout(res, ms));
+            const RETRY_DELAY_MS = 2000;
+            const MAX_RETRIES = 3;
+            const isRetryable = (msg: string) =>
+                msg.includes('500') || msg.includes('503') || msg.includes('UNAVAILABLE') || msg.includes('INTERNAL') || msg.includes('high demand');
 
             console.log('캐릭터 궁합 - AI 요청 시작 시간:', new Date().toISOString());
-            let aiResp: Awaited<ReturnType<typeof this.ai.models.generateContent>>;
-            try {
-                aiResp = await this.ai.models.generateContent({ model: PRIMARY_MODEL, contents });
-            } catch (err: unknown) {
-                const msg = err instanceof Error ? err.message : String(err);
-                if (msg.includes('503') || msg.includes('UNAVAILABLE') || msg.includes('high demand') || msg.includes('500') || msg.includes('INTERNAL')) {
-                    console.warn(`캐릭터 궁합 - 기본 모델(${PRIMARY_MODEL}) 에러(${msg}), fallback(${FALLBACK_MODEL}) 사용`);
-                    aiResp = await this.ai.models.generateContent({ model: FALLBACK_MODEL, contents });
-                } else {
-                    throw err;
+            let aiResp: Awaited<ReturnType<typeof this.ai.models.generateContent>> | undefined;
+            let lastErr: unknown;
+
+            for (let attempt = 1; attempt <= MAX_RETRIES && !aiResp; attempt++) {
+                try {
+                    aiResp = await this.ai.models.generateContent({ model: PRIMARY_MODEL, contents });
+                } catch (err: unknown) {
+                    const msg = err instanceof Error ? err.message : String(err);
+                    if (!isRetryable(msg)) throw err;
+                    lastErr = err;
+                    if (attempt < MAX_RETRIES) {
+                        console.warn(`캐릭터 궁합 - 기본 모델(${PRIMARY_MODEL}) 에러, ${attempt}/${MAX_RETRIES} 재시도 중... (${RETRY_DELAY_MS * attempt}ms 후)`);
+                        await sleep(RETRY_DELAY_MS * attempt);
+                    }
                 }
             }
+
+            if (!aiResp) {
+                console.warn(`캐릭터 궁합 - 기본 모델(${PRIMARY_MODEL}) 실패, fallback(${FALLBACK_MODEL}) 시도`);
+                for (let attempt = 1; attempt <= MAX_RETRIES && !aiResp; attempt++) {
+                    try {
+                        aiResp = await this.ai.models.generateContent({ model: FALLBACK_MODEL, contents });
+                    } catch (err: unknown) {
+                        const msg = err instanceof Error ? err.message : String(err);
+                        if (!isRetryable(msg)) throw err;
+                        lastErr = err;
+                        if (attempt < MAX_RETRIES) {
+                            console.warn(`캐릭터 궁합 - fallback 모델(${FALLBACK_MODEL}) 에러, ${attempt}/${MAX_RETRIES} 재시도 중... (${RETRY_DELAY_MS * attempt}ms 후)`);
+                            await sleep(RETRY_DELAY_MS * attempt);
+                        }
+                    }
+                }
+            }
+
+            if (!aiResp) throw lastErr ?? new Error('캐릭터 궁합 AI 모델 요청 실패');
             console.log('캐릭터 궁합 - AI 응답 수신 시간:', new Date().toISOString());
 
             const parsed = JSON.parse((aiResp.text || '{}').replace(/```json/g, '').replace(/```/g, '').trim());
