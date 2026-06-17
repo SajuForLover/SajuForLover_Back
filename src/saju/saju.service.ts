@@ -3,6 +3,7 @@ import { CreateSajuDto } from './dto/create-saju.dto';
 import { UpdateSajuDto } from './dto/update-saju.dto';
 import { GoogleGenAI } from '@google/genai';
 import { ConfigService } from '@nestjs/config';
+import { callOpenRouterText } from '@/common/openrouter.helper';
 import { v1 as uuid } from 'uuid';
 import { Saju } from './entities/saju.entity';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -187,12 +188,23 @@ export class SajuService {
       }
     }
 
-    if (!response) throw lastErr ?? new Error('사주 AI 모델 요청 실패');
+    let rawText: string | null = response ? (response.text ?? null) : null;
+
+    if (!rawText) {
+      const openRouterKey = this.configService.get<string>('OPENROUTER_API_KEY');
+      if (openRouterKey) {
+        console.warn('사주 - Google 모델 전부 실패, OpenRouter(openai/gpt-oss-120b:free) 시도');
+        rawText = await callOpenRouterText(openRouterKey, 'openai/gpt-oss-120b:free', prompt);
+      } else {
+        throw lastErr ?? new Error('사주 AI 모델 요청 실패');
+      }
+    }
+
     const end = new Date();
     console.log('사주 - AI 응답 완료 시간:', end.toISOString());
     console.log(`사주 - AI 응답 시간: ${(end.getTime() - start.getTime()) / 1000}초`);
 
-    const data = response.text ? JSON.parse(response.text.replace(/```json/g, '').replace(/```/g, '').trim()) : null;
+    const data = rawText ? JSON.parse(rawText.replace(/```json/g, '').replace(/```/g, '').trim()) : null;
 
     if (await this.sajuRepository.findOne({ where: { user: { uuid: user_id } } })) {
       await this.sajuRepository.update({ user: { uuid: user_id } }, { data: data, isDone: true });
