@@ -55,7 +55,7 @@ export class SajuService {
 
   async createSajuData(user_id: string, userInput: any) {
     const prompt = `
-      당시은 사주를 분석하는 전문가입니다. 다음은 사주 분석에 필요한 정보입니다. 아래 정보를 바탕으로 사주 분석을 해주세요.
+      당시은 사주를 분석하는 30년차 전문가입니다. 다음은 사주 분석에 필요한 정보입니다. 아래 정보를 바탕으로 사주 분석을 해주세요.
       이름: ${userInput.name}
       성별: ${userInput.gender}
       생년월일: ${userInput.birthDate}
@@ -133,7 +133,7 @@ export class SajuService {
           "warning_note": "고집이 너무 세서 팀원들이 숨막혀 할 수 있음!"
         },
         "fortune": {
-          "lucky_colors": ["Red", "White"],
+          "lucky_colors": ["Red", "White"], // 무조건 2개, 영어로
           "lucky_food": "매콤한 낙지볶음 (부족한 화 기운 보강)",
           "lucky_numbers": [2, 7],
           "best_partner": "따뜻한 햇살 같은 캐릭터 (화 기운)",
