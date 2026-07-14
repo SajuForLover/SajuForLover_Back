@@ -29,6 +29,13 @@ DB_PORT=3306
 DB_USERNAME=root
 DB_PASSWORD=your_password
 DB_DATABASE=db_name
+
+# OpenRouter API Key (선택: Google AI 모델이 사용량 초과시 전환)
+OPENROUTER_API_KEY=
+
+# 사주 및 관상, 궁합 정보를 이메일로 전송 (필수)
+MAIL_USER=SajuForLover@gmail.com
+MAIL_PASSWORD=
 ```
 
 ## 프로젝트 실행 (Running the app)
