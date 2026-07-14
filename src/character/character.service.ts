@@ -321,7 +321,8 @@ export class CharacterService {
                             캐릭터: ${JSON.stringify(best.meta)}
                             사용자 요약: ${userSummary}`;
 
-            const PRIMARY_MODEL = 'gemma-4-26b-a4b-it';
+            // const PRIMARY_MODEL = 'gemma-4-26b-a4b-it';
+            const PRIMARY_MODEL = 'gemini-3.1-flash-lite';
             const FALLBACK_MODEL = 'gemma-4-31b-it';
             const contents = [{ role: 'user', parts: [{ text: prompt }] }];
             const sleep = (ms: number) => new Promise<void>(res => setTimeout(res, ms));
